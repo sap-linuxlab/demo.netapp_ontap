@@ -1,0 +1,27 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Onboard SVM
+  tasks:
+  - name: Create SVM
+    na_ontap_svm:
+      state: present
+      name: "{{ svmname }}"
+      use_rest: always
+      services:
+        cifs:
+          allowed: false
+        fcp:
+          allowed: false
+        nfs:
+          allowed: true
+          enabled: true
+      aggr_list: "{{ aggrlist }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

@@ -1,0 +1,21 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Restore FlexVol
+  tasks:
+  - name: Restore Volume
+    na_ontap_volume:
+      state: present
+      name: "{{ datavolumename }}"
+      use_rest: always
+      snapshot_restore: "{{ datavolumename }}{{ snapshotpostfix }}"
+      vserver: "{{ svmname }}"
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

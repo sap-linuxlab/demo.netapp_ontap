@@ -1,0 +1,17 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Set SVM Options
+  tasks:
+  - name: Set SVM Options via CLI
+    na_ontap_command:
+      use_rest: always
+      hostname: "{{ (inventory_)hostname }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+      command: ['set advanced -confirmations off; nfs modify -vserver "{{ svmname }}" -tcp-max-xfer-size 1048576; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}"  -snapdir-access true; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -snapshot-policy none; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -atime-update false']

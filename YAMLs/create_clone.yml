@@ -1,0 +1,22 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Create FlexClone
+  tasks:
+  - name: Clone Volume
+    na_ontap_volume_clone:
+      state: present
+      name: "{{ datavolumename }}{{ clonepostfix }}"
+      use_rest: always
+      vserver: "{{ svmname }}"
+      junction_path: '/{{ datavolumename }}{{ clonepostfix }}'
+      parent_volume: "{{ datavolumename }}"
+      parent_snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

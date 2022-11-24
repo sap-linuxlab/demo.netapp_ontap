@@ -1,0 +1,27 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Onboard FlexVol
+  tasks:
+  - name: Create Volume
+    na_ontap_volume:
+      state: present
+      name: "{{ datavolumename }}"
+      aggregate_name: "{{ dataaggrname }}"
+      use_rest: always
+      size: "{{ datavolumesize }}"
+      size_unit: "{{ sizeunit }}"
+      tiering_policy: none
+      export_policy: "{{ exportpolicyname }}"
+      percent_snapshot_space: 80
+      vserver: "{{ svmname }}"
+      junction_path: '/{{ datavolumename }}'
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

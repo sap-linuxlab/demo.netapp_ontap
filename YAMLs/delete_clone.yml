@@ -1,0 +1,21 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Delete FlexClone
+  tasks:
+  - name: Delete Clone
+    na_ontap_volume:
+      state: absent
+      name: "{{ datavolumename }}{{ clonepostfix }}"
+      aggregate_name: "{{ dataaggrname }}"
+      use_rest: always
+      vserver: "{{ svmname }}"
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

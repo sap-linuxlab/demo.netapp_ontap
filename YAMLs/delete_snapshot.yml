@@ -1,0 +1,20 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: SnapShot
+  tasks:
+  - name: Delete SnapShot
+    na_ontap_snapshot:
+      state: absent
+      snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
+      use_rest: always
+      volume: "{{ datavolumename }}"
+      vserver: "{{ svmname }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

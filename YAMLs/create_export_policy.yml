@@ -1,0 +1,23 @@
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Export Policy
+  tasks:
+  - name: Create Export Policy
+    na_ontap_export_policy_rule:
+      state: present
+      name: "{{ exportpolicyname }}"
+      vserver: "{{ svmname }}"
+      rule_index: "{{ ruleindex }}"
+      client_match: "{{ networkrange }}"
+      protocol: "{{ protocols }}"
+      hostname: "{{ (inventory_)hostname }}"
+      ro_rule : "{{ rorule }}"
+      rw_rule: "{{ rwrule }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false

@@ -1,0 +1,21 @@
+---
+
+- name: Get System details 1
+  connection: local
+  collections:
+    - netapp.ontap
+  hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+
+
+  tasks:
+  - name: Get details of installed cluster
+    na_ontap_command:
+      use_rest: always
+      hostname: "{{ (inventory_)hostname }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+      command: ['system show -instance']
+    register: ontap_return
+  - debug: var=ontap_return
