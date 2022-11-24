@@ -1,52 +1,52 @@
 # Table of Contents
 
-[Table of Contents 1](#_Toc120111116)
+[Table of Contents](#Table-of-Contents)
 
-[Table of Figures 2](#_Toc120111117)
+[Table of Figures](#Table-of-Figures)
 
-[Table of Tables 2](#_Toc120111118)
+[Table of Tables](#Table-of-Tables)
 
-[Version History 3](#_Toc120111119)
+[Version History](#Version-History)
 
-[Introduction 3](#_Toc120111120)
+[Introduction](#Introduction)
 
-[Target audience and document goal 3](#_Toc120111121)
+[Target audience and document goal](#Target-audience-and-document-goal)
 
-[Getting started 3](#_Toc120111122)
+[Getting started](#Getting-started)
 
-[Prepare the environment 5](#_Toc120111123)
+[Prepare the environment](#Prepare-the-environment)
 
-[Prepare Ubuntu system 5](#_Toc120111124)
+[Prepare Ubuntu system](#Prepare-Ubuntu-system)
 
-[Add Ansible APT repository 5](#_Toc120111125)
+[Add Ansible APT repository](#Add-Ansible-APT-repository)
 
-[Install Ansible 6](#_Toc120111126)
+[Install Ansible](#Install-Ansible)
 
-[Verify collections and if necessary, upgrade netapp.ontap collection 6](#_Toc120111127)
+[Verify collections and if necessary, upgrade netapp.ontap collection](#Verify-collections-and-if-necessary,-upgrade-netapp.ontap-collection)
 
-[Install ZAPI Libs for Python 8](#_Toc120111128)
+[Install ZAPI Libs for Python](#Install-ZAPI-Libs-for-Python)
 
-[Prepare ONTAP 8](#_Toc120111129)
+[Prepare ONTAP](#Prepare-ONTAP)
 
-[Create self-signed certificate on the Linux server on which you run the Ansible playbooks 8](#_Toc120111130)
+[Create self-signed certificate on the Linux server on which you run the Ansible playbooks](#Create-self-signed-certificate-on-the-Linux-server-on-which-you-run-the-Ansible-playbooks)
 
-[Add certificates to ONTAP and configure users and passwords 9](#_Toc120111131)
+[Add certificates to ONTAP and configure users and passwords](#Add-certificates-to-ONTAP-and-configure-users-and-passwords)
 
-[Workflows 10](#_Toc120111132)
+[Workflows](#Workflows)
 
-[Day 1 10](#_Toc120111133)
+[Day 1](#Day-1)
 
-[Daily operation 11](#_Toc120111134)
+[Daily operation](#Daily-operation)
 
-[Day 2 12](#_Toc120111135)
+[Day 2](#Day-2)
 
-[Cleanup 14](#_Toc120111136)
+[Cleanup](#Cleanup)
 
-[Querying ONTAP information using Playbooks 14](#_Toc120111137)
+[Querying ONTAP information using Playbooks](#Querying-ONTAP-information-using-Playbooks)
 
-[Running Playbooks 14](#_Toc120111138)
+[Running Playbooks](#Running-Playbooks)
 
-[YAML Files 14](#_Toc120111139)
+[YAML Files](#YAML-Files)
 
 [inventory.yml 15](#_Toc120111140)
 
@@ -82,17 +82,17 @@
 
 # Table of Figures
 
-[Figure 1: Current collection version from netapp.ontap 6](#_Toc120110909)
+[Figure 1: Current collection version from netapp.ontap](#Figure-1:-Current-collection-version-from-netapp.ontap)
 
-[Figure 2: Workflow Day 1 automation 11](#_Toc120110910)
+[Figure 2: Workflow Day 1 automation](#Day-1)
 
-[Figure 3: Workflow for daily operation 12](#_Toc120110911)
+[Figure 3: Workflow for daily operation](#Daily-operation)
 
-[Figure 4: Workflow Day 2 automation 13](#_Toc120110912)
+[Figure 4: Workflow Day 2 automation](#Day-2)
 
 # Table of Tables
 
-[Table 1: Version history 3](#_Toc120110988)
+[Table 1: Version history](#Version-history)
 
 # Version History
 
