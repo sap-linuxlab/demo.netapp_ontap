@@ -1,0 +1,21 @@
+---
+
+- name: Get SVMs
+  collections:
+    - netapp.ontap
+  hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+
+  tasks:
+  - name: Get details of configured SVMs
+    na_ontap_rest_info:
+      use_rest: always
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+      gather_subset:
+      - svm/svms
+    register: ontap_return
+  - debug: var=ontap_return
