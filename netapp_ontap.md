@@ -48,41 +48,41 @@
 
 [YAML Files](#YAML-Files)
 
-[inventory.yml 15](#_Toc120111140)
+[inventory.yml](#inventory.yml)
 
-[ontap\_vars.yml 16](#_Toc120111141)
+[ontap\_vars.yml](#ontap\_vars.yml)
 
-[system\_details.yml (ZAPI API and native CLI command) 16](#_Toc120111142)
+[system\_details.yml (ZAPI API and native CLI command)](#system\_details.yml-(ZAPI-API-and-native-CLI-command))
 
-[get\_svms.yml (REST API) 17](#_Toc120111143)
+[get\_svms.yml (REST API)](#get\_svms.yml-(REST-API))
 
-[create\_svm.yml 18](#_Toc120111144)
+[create\_svm.yml](#create\_svm.yml)
 
-[set\_svm\_options.yml 19](#_Toc120111145)
+[set\_svm\_options.yml](#set\_svm\_options.yml)
 
-[create\_export\_policy.yml 20](#_Toc120111146)
+[create\_export\_policy.yml](#create\_export\_policy.yml)
 
-[create\_volume.yml 20](#_Toc120111147)
+[create\_volume.yml](#create\_volume.yml)
 
-[create\_snapshot.yml 21](#_Toc120111148)
+[create\_snapshot.yml](#create\_snapshot.yml)
 
-[restore\_snapshot.yml 22](#_Toc120111149)
+[restore\_snapshot.yml](#restore\_snapshot.yml)
 
-[create\_clone.yml 23](#_Toc120111150)
+[create\_clone.yml](#create\_clone.yml)
 
-[delete\_clone.yml 24](#_Toc120111151)
+[delete\_clone.yml](#delete\_clone.yml)
 
-[delete\_snapshot.yml 24](#_Toc120111152)
+[delete\_snapshot.yml](delete\_snapshot.yml)
 
-[delete\_volume.yml 25](#_Toc120111153)
+[delete\_volume.yml](#delete\_volume.yml)
 
-[delete\_svm.yml 26](#_Toc120111154)
+[delete\_svm.yml](#delete\_svm.yml)
 
-[References 26](#_Toc120111155)
+[References](#References)
 
 # Table of Figures
 
-[Figure 1: Current collection version from netapp.ontap](#Figure-1:-Current-collection-version-from-netapp.ontap)
+[Figure 1: Current collection version from netapp.ontap](#Verify-collections-and-if-necessary,-upgrade-netapp.ontap-collection)
 
 [Figure 2: Workflow Day 1 automation](#Day-1)
 
@@ -111,7 +111,7 @@ This document describes how to execute Ansible Playbooks against NetApp ONTAP sy
 
 ## Target audience and document goal
 
-the document is intended to give SAP administrators an introduction to the Ansible automation of recurring administrative activities.
+The document is intended to give SAP administrators an introduction to the Ansible automation of recurring administrative activities.
 
 - This document includes
   - Brief description how to automate tasks on NetApp ONTAP systems
@@ -134,9 +134,9 @@ This document can therefore be used for the following storage products:
 - Cloud Volumes ONTAP (CVO)
 - Amazon FSx for NetApp ONTAP (FSxN)
 
-To run Ansible Playbooks a prerequisite is a running Ansible version. There are a lot of tutorials how to install Ansible on MacOS, Linux, Windows are available on the internet. In our environment we decided to use Ubuntu as operating system and run Ansible. For completeness, we will also cover what needs to be configured on the Ubuntu system. This is described in the chapter [Prepare Ubuntu system](#_Prepare_Ubuntu_system). If Ansible should run on another operating system, Ansible and the operating system need to be prepared accordingly.
+To run Ansible Playbooks a prerequisite is a running Ansible version. There are a lot of tutorials how to install Ansible on MacOS, Linux, Windows are available on the internet. In our environment we decided to use Ubuntu as operating system and run Ansible. For completeness, we will also cover what needs to be configured on the Ubuntu system. This is described in the chapter [Prepare Ubuntu system](#Prepare-Ubuntu-system). If Ansible should run on another operating system, Ansible and the operating system need to be prepared accordingly.
 
-What needs to be configured on the ONTAP based system will be described in the chapter [Prepare ONTAP](#_Prepare_ONTAP).
+What needs to be configured on the ONTAP based system will be described in the chapter [Prepare ONTAP](#Prepare-ONTAP).
 
 First, it is important to mention, that there are 4 ways to interact with ONTAP based systems.
 
@@ -161,7 +161,7 @@ There are four different scenarios depending on the API being used
 2. We us a module and specify parameters which are available using the REST API **and** ZAPI API. We specify at least one parameter which is available **only** with REST API.
  This results in using the REST API
 3. We us a module and specify parameters which are available using the REST API **and** ZAPI API. We specify at least one parameter available **only** with ZAPI API.
- This results in using the ZAPI API. If ZAPI API is being used, Ansible will print a warning like this: [WARNING]: Using ZAPI for na\_ontap\_command, ignoring 'use\_rest: always'.
+ This results in using the ZAPI API. If ZAPI API is being used, Ansible will print a warning like this: WARNING: Using ZAPI for na\_ontap\_command, ignoring 'use\_rest: always'.
 4. We us a module and specify parameters which are available using the REST API and ZAPI API. We specify at least one parameter which is available **only** with ZAPI API **and** we specify at least one parameter which is available **only** with REST API.
  This results in an error, because for a module only REST API or ZAPI API can be used
 
@@ -172,7 +172,7 @@ Since we must use REST API or ZAPI API to execute commands via Ansible on ONTAP 
 1. User/Password based authentication
 2. Certificate based authentication
 
-User/Password based authentication is not the preferred way, because no one wants to enter a password in plain text in a config file. Certificate authentication is the preferred way to go. How to set up certificate based authentication will be described in chapter [Prepare ONTAP](#_Prepare_ONTAP). Unfortunately, not all commands available via NetApp ONTAP command line are exposed through REST API and/or ZAPI API. ZAPI API offers a module to execute native ONTAP command line commands. When using this module, certificate authentication can not be used. Instead, user/password authentication must be used.
+User/Password based authentication is not the preferred way, because no one wants to enter a password in plain text in a config file. Certificate authentication is the preferred way to go. How to set up certificate based authentication will be described in chapter [Prepare ONTAP](#prepare-ontap). Unfortunately, not all commands available via NetApp ONTAP command line are exposed through REST API and/or ZAPI API. ZAPI API offers a module to execute native ONTAP command line commands. When using this module, certificate authentication can not be used. Instead, user/password authentication must be used.
 
 # Prepare the environment
 
@@ -187,12 +187,12 @@ In our environment we used an Ubuntu 20.04 system to run Ansible playbooks. This
 The preparation of the Ubuntu system with regards to the requirements described above consists of the following steps
 
 1. Install Ansible version
-  1. [Add Ansible APT repository](#_Add_Ansible_APT)
-  2. [Install Ansible](#_Install_Ansible)
+   1. [Add Ansible APT repository](#Add-Ansible-APT-repository)
+   2. [Install Ansible](#Install-Ansible)
 2. ontap collection
-  1. [Verify collections and if necessary, upgrade netapp.ontap collection](#_Verify_collections_and)
-3. Necessary python dependencies
-  1. [Install ZAPI Libs for Python](#_Install_ZAPI_Libs)
+   1. [Verify collections and if necessary, upgrade netapp.ontap collection](#_Verify-collections-and-if-necessary,-upgrade-netapp.ontap-collection)
+3. Necessary python dependencies a
+   1. [Install ZAPI Libs for Python](#Install-ZAPI-Libs)
 
 If you plan to run Ansible on a different operating system (i.e. MacOS), you have to implement the requirements accordingly.
 
@@ -285,14 +285,14 @@ Now we must prepare ONTAP to be able to access the REST API and ZAPI API using c
 
 The following steps are necessary:
 
-- [Create self-signed certificate on the Linux server on which you run the Ansible playbooks](#_Create_self-signed_certificate)
+- [Create self-signed certificate on the Linux server on which you run the Ansible playbooks](#Create-self-signed-certificate-on-the-Linux-server-on-which-you-run-the-Ansible-playbooks)
 We will create a public key file and a private key file on the Linux server on which we plan to run the Ansible playbooks.
-- [Add certificates to ONTAP and configure users and passwords](#_Add_certificates_to)
+- [Add certificates to ONTAP and configure users and passwords](#Add-certificates-to-ONTAP-and-configure-users-and-passwords)
 The public key file create in the step above will then be uploaded to the ONTAP system to allow authentication using the private key file, also created in the step above, to access the REST and/or ZAPI API.
 
 ### Create self-signed certificate on the Linux server on which you run the Ansible playbooks
 
-When you create the self-signed certificate on the Linux server, it is important to enter the username in "Common Name" which you are going to configure in ONTAP in the steps described in chapter [Add certificates to ONTAP and configure users and passwords](#_Add_certificates_to)
+When you create the self-signed certificate on the Linux server, it is important to enter the username in "Common Name" which you are going to configure in ONTAP in the steps described in chapter [Add certificates to ONTAP and configure users and passwords](#Add-certificates-to-ONTAP-and-configure-users-and-passwords)
 
 - Create self-signed certificate
  The following command creates two files, ontap.key which is the private key and ontap.pem which is the public key:
@@ -349,25 +349,25 @@ testcl1::\> security login create -user-or-group-name holger -application consol
 
 Now that everything is prepared on the Linux server and inside ONTAP we can start to configure the necessary Ansible Playbooks
 
-- [Day 1](#_Day_1) automation
-- [Daily operation](#_Daily_operation)
-- [Day 2](#_Day_2) automation
-- In addition, we added Playbooks needed for [Cleanup](#_Cleanup)
-- Querying ONTAP information is described in [Querying ONTAP information using Playbooks](#_Querying_ONTAP_information)
+- [Day 1](#Day-1) automation
+- [Daily operation](#Daily-operation)
+- [Day 2](#Day-2) automation
+- In addition, we added Playbooks needed for [Cleanup](#Cleanup)
+- Querying ONTAP information is described in [Querying ONTAP information using Playbooks](#Querying-ONTAP-information-using-Playbooks)
 
 ## Day 1
 
 The necessary steps for Day 1 automation are visualized in Figure 2. The following Playbooks are needed:
 
-- [create\_svm.yml](#_create_svm.yml)
+- [create\_svm.yml](#create_svm.yml)
  If necessary, create a new SVM which will be used for creating the needed volumes.
-- [set\_svm\_options.yml](#_set_svm_options.yml)
+- [set\_svm\_options.yml](#set_svm_options.yml)
  Set SVM options needed for optimal performance
-- [create\_export\_policy.yml](#_create_export_policy.yml)
+- [create\_export\_policy.yml](#create_export_policy.yml)
  If necessary, create a new export which will be assigned to the newly created volumes.
-- [create\_volume.yml](#_create_volume.yml)
+- [create\_volume.yml](#create_volume.yml)
  Create new volumes
-- [create\_snapshot.yml](#_create_snapshot.yml)
+- [create\_snapshot.yml](#create_snapshot.yml)
  Take a SnapShot from the newly created volumes
 
 ![](RackMultipart20221124-1-7e8pfc_html_be77a18189013a4a.png)
@@ -378,7 +378,7 @@ _Figure 2: Workflow Day 1 automation_
 
 The necessary steps for daily operation are visualized in Figure 3. The following Playbooks are needed:
 
-- [restore\_snapshot.yml](#_restore_snapshot.yml)
+- [restore\_snapshot.yml](#restore_snapshot.yml)
  Restore a SnapShot
 
 ![](RackMultipart20221124-1-7e8pfc_html_7a65b2f345aab652.png)
@@ -389,9 +389,9 @@ _Figure 3: Workflow for daily operation_
 
 For Day 2 automation we assume, that we need to do SAP system refreshes. The workflow for Day 2 automation is visualized in Figure 4. The following Playbooks are needed:
 
-- [create\_snapshot.yml](#_create_snapshot.yml)
+- [create\_snapshot.yml](#create_snapshot.yml)
  If necessary, create a SnapShot
-- [create\_clone.yml](#_create_clone.yml)
+- [create\_clone.yml](#create_clone.yml)
  Create FelxClone
 
 ![](RackMultipart20221124-1-7e8pfc_html_9767b945efa74671.png)
@@ -402,13 +402,13 @@ _Figure 4: Workflow Day 2 automation_
 
 To clean up everything i.e., deleting a FlexClone before creating a new FlexClone the following Playbooks are needed:
 
-- [delete\_clone.yml](#_delete_clone.yml)
+- [delete\_clone.yml](#delete_clone.yml)
  Delete existing FlexClone
-- [delete\_snapshot.yml](#_delete_snapshot.yml)
+- [delete\_snapshot.yml](#delete_snapshot.yml)
  Delete existing SnapShot
-- [delete\_volume.yml](#_delete_volume.yml)
+- [delete\_volume.yml](#delete_volume.yml)
  Delete existing Volume
-- [delete\_svm.yml](#_delete_svm.yml)
+- [delete\_svm.yml](#delete_svm.yml)
  Delete Storage Virtual Machine
 
 ## Querying ONTAP information using Playbooks
@@ -416,9 +416,9 @@ To clean up everything i.e., deleting a FlexClone before creating a new FlexClon
 As mentioned before, there are two ways of querying ONTAP details.
 
 - Running native CLI commands using ZAPI API
-[system\_details.yml (ZAPI API and native CLI command)](#_system_details.yml_(ZAPI_API)
+[system\_details.yml (ZAPI API and native CLI command)](#system_details.yml-(ZAPI-API-and-native-CLI-command))
 - Querying predefined information using REST API.
-[get\_svms.yml (REST API)](#_get_svms.yml_(REST_API))
+[get\_svms.yml (REST API)](#get_svms.yml-(REST-API))
 
 If information is needed which is not accessible via REST AP, ZAPI API must be used. Examples are documented in the two YAML files mentioned above.
 
@@ -433,11 +433,11 @@ ansible-playbook -i inventory.yml create\_svm.yml
 - Use variables defined in a variable file. To run the Playbook Playbook using an inventory defined in ontap\_vars.yml execute
 ansible-playbook create\_svm.yml --extra-vars "@ontap\_vars.yml"
 
-An example inventory file is shown in chapter [inventory.yml](#_inventory.yml).
+An example inventory file is shown in chapter [inventory.yml](#inventory.yml).
 
-An example variable file is shown in chapter [ontap\_vars.yml](#_ontap_vars.yml).
+An example variable file is shown in chapter [ontap\_vars.yml](#ontap_vars.yml).
 
-The key value pairs are self-explaining and fit parameters which are described for each netapp.ontap Ansible module. The subsequent Playbooks make use of the defined variables either from [inventory.yml](#_inventory.yml) or from [ontap\_vars.yml](#_ontap_vars.yml)
+The key value pairs are self-explaining and fit parameters which are described for each netapp.ontap Ansible module. The subsequent Playbooks make use of the defined variables either from [inventory.yml](#inventory.yml) or from [ontap\_vars.yml](#ontap_vars.yml)
 
 # YAML Files
 
@@ -445,695 +445,45 @@ Here are all needed YAML files.
 
 ## inventory.yml
 
-ontapservers:
-
-hosts:
-
-testcl1-01:
-
-hostname: 192.168.71.25 or ansible\_host (use inventory\_hostname then in playbook)
-
-ansible\_host: 192.168.71.25
-
-username: "holger"
-
-password: "your password"
-
-keyfile: "/root/ansible/certs/ontap.key"
-
-certfile: "/root/ansible/certs/ontap.pem"
-
-svmname: "svm-sap03"
-
-aggrlist: "data\_aggr\_0"
-
-exportpolicyname: "192er\_LAN\_SAP"
-
-sizeunit: "gb"
-
-datavolumesize: "100"
-
-datavolumename: "L01\_data"
-
-logvolumename: "L01\_log"
-
-logvolumesize: "256"
-
-sharedvolumename: "L01\_shared"
-
-sharedvolumesize: "256"
-
-dataaggrname: "data\_aggr\_0"
-
-protocols: "nfs,nfs3"
-
-networkrange: "192.168.71.0/24"
-
-ruleindex: "100"
-
-rorule: "none"
-
-rwrule: "any"
-
-snapshotpostfix: "\_snap\_1"
-
-clonepostfix: "\_clone\_1"
-
-linuxservers:
-
-hosts:
-
-velociraptor:
-
-ansible\_host: 192.168.71.229
-
-ansible\_ssh\_user: holger
-
-ansible\_password: \<your password\>
 
 ## ontap\_vars.yml
 
-hostname: "192.168.71.25"
-
-username: "holger"
-
-password: "your password"
-
-keyfile: "/root/ansible/certs/ontap.key"
-
-certfile: "/root/ansible/certs/ontap.pem"
-
-svmname: "svm-sap03"
-
-aggrlist: "data\_aggr\_0"
-
-exportpolicyname: "192er\_LAN\_SAP"
-
-sizeunit: "gb"
-
-datavolumesize: "100"
-
-datavolumename: "L01\_data"
-
-logvolumename: "L01\_log"
-
-logvolumesize: "256"
-
-sharedvolumename: "L01\_shared"
-
-sharedvolumesize: "256"
-
-dataaggrname: "data\_aggr\_0"
-
-protocols: "nfs,nfs3"
-
-networkrange: "192.168.71.0/24"
-
-ruleindex: "100"
-
-rorule: "none"
-
-rwrule: "any"
-
-snapshotpostfix: "\_snap\_1"
-
-clonepostfix: "\_clone\_1"
 
 ## system\_details.yml (ZAPI API and native CLI command)
 
----
-
-- name: Get System details 1
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-tasks:
-
-- name: Get details of installed cluster
-
-na\_ontap\_command:
-
-use\_rest: always
-
-hostname: "{{ (inventory\_)hostname }}"
-
-username: "{{ username }}"
-
-password: "{{ password }}"
-
-https: true
-
-validate\_certs: false
-
-command: ['system show -instance']
-
-register: ontap\_return
-
-- debug: var=ontap\_return
 
 ## get\_svms.yml (REST API)
 
----
-
-- name: Get SVMs
-
-collections:
-
-- netapp.ontap
-
-hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-tasks:
-
-- name: Get details of configured SVMs
-
-na\_ontap\_rest\_info:
-
-use\_rest: always
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
-
-gather\_subset:
-
-- svm/svms
-
-register: ontap\_return
-
-- debug: var=ontap\_return
 
 ## create\_svm.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Onboard SVM
-
-tasks:
-
-- name: Create SVM
-
-na\_ontap\_svm:
-
-state: present
-
-name: "{{ svmname }}"
-
-use\_rest: always
-
-services:
-
-cifs:
-
-allowed: false
-
-fcp:
-
-allowed: false
-
-nfs:
-
-allowed: true
-
-enabled: true
-
-aggr\_list: "{{ aggrlist }}"
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## set\_svm\_options.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Set SVM Options
-
-tasks:
-
-- name: Set SVM Options via CLI
-
-na\_ontap\_command:
-
-use\_rest: always
-
-hostname: "{{ (inventory\_)hostname }}"
-
-username: "{{ username }}"
-
-password: "{{ password }}"
-
-https: true
-
-validate\_certs: false
-
-command: ['set advanced -confirmations off; nfs modify -vserver "{{ svmname }}" -tcp-max-xfer-size 1048576; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -snapdir-access true; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -snapshot-policy none; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -atime-update false']
 
 ## create\_export\_policy.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Export Policy
-
-tasks:
-
-- name: Create Export Policy
-
-na\_ontap\_export\_policy\_rule:
-
-state: present
-
-name: "{{ exportpolicyname }}"
-
-vserver: "{{ svmname }}"
-
-rule\_index: "{{ ruleindex }}"
-
-client\_match: "{{ networkrange }}"
-
-protocol: "{{ protocols }}"
-
-hostname: "{{ (inventory\_)hostname }}"
-
-ro\_rule : "{{ rorule }}"
-
-rw\_rule: "{{ rwrule }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## create\_volume.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Onboard FlexVol
-
-tasks:
-
-- name: Create Volume
-
-na\_ontap\_volume:
-
-state: present
-
-name: "{{ datavolumename }}"
-
-aggregate\_name: "{{ dataaggrname }}"
-
-use\_rest: always
-
-size: "{{ datavolumesize }}"
-
-size\_unit: "{{ sizeunit }}"
-
-tiering\_policy: none
-
-export\_policy: "{{ exportpolicyname }}"
-
-percent\_snapshot\_space: 80
-
-vserver: "{{ svmname }}"
-
-junction\_path: '/{{ datavolumename }}'
-
-wait\_for\_completion: True
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## create\_snapshot.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: SnapShot
-
-tasks:
-
-- name: Create SnapShot
-
-na\_ontap\_snapshot:
-
-state: present
-
-snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
-
-use\_rest: always
-
-volume: "{{ datavolumename }}"
-
-vserver: "{{ svmname }}"
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## restore\_snapshot.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Restore FlexVol
-
-tasks:
-
-- name: Restore Volume
-
-na\_ontap\_volume:
-
-state: present
-
-name: "{{ datavolumename }}"
-
-use\_rest: always
-
-snapshot\_restore: "{{ datavolumename }}{{ snapshotpostfix }}"
-
-vserver: "{{ svmname }}"
-
-wait\_for\_completion: True
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## create\_clone.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Create FlexClone
-
-tasks:
-
-- name: Clone Volume
-
-na\_ontap\_volume\_clone:
-
-state: present
-
-name: "{{ datavolumename }}{{ clonepostfix }}"
-
-use\_rest: always
-
-vserver: "{{ svmname }}"
-
-junction\_path: '/{{ datavolumename }}{{ clonepostfix }}'
-
-parent\_volume: "{{ datavolumename }}"
-
-parent\_snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## delete\_clone.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Delete FlexClone
-
-tasks:
-
-- name: Delete Clone
-
-na\_ontap\_volume:
-
-state: absent
-
-name: "{{ datavolumename }}{{ clonepostfix }}"
-
-aggregate\_name: "{{ dataaggrname }}"
-
-use\_rest: always
-
-vserver: "{{ svmname }}"
-
-wait\_for\_completion: True
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
-
-## delete\_snapshot.yml
-
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: SnapShot
-
-tasks:
-
-- name: Delete SnapShot
-
-na\_ontap\_snapshot:
-
-state: absent
-
-snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
-
-use\_rest: always
-
-volume: "{{ datavolumename }}"
-
-vserver: "{{ svmname }}"
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## delete\_volume.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: Delete FlexVol
-
-tasks:
-
-- name: Delete Volume
-
-na\_ontap\_volume:
-
-state: absent
-
-name: "{{ datavolumename }}"
-
-aggregate\_name: "{{ dataaggrname }}"
-
-use\_rest: always
-
-vserver: "{{ svmname }}"
-
-wait\_for\_completion: True
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 ## delete\_svm.yml
 
----
-
-- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
-
-connection: local
-
-collections:
-
-- netapp.ontap
-
-gather\_facts: false
-
-name: SVM
-
-tasks:
-
-- name: Delete SVM
-
-na\_ontap\_svm:
-
-state: absent
-
-name: "{{ svmname }}"
-
-use\_rest: always
-
-aggr\_list: "{{ aggrlist }}"
-
-hostname: "{{ (inventory\_)hostname }}"
-
-cert\_filepath: "{{ certfile }}"
-
-key\_filepath: "{{ keyfile }}"
-
-https: true
-
-validate\_certs: false
 
 # References
 
