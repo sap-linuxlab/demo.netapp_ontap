@@ -22,7 +22,7 @@
 
 [Install Ansible](#Install-Ansible)
 
-[Verify collections and if necessary upgrade netapp.ontap collection](#Verify-collections-and-if-necessary-upgrade-netapp.ontap-collection)
+[Verify collections and if necessary upgrade netapp.ontap collection](#Verify-collections-and-if-necessary-upgrade-netapp\.ontap-collection)
 
 [Install ZAPI Libs for Python](#Install-ZAPI-Libs-for-Python)
 
@@ -82,7 +82,7 @@
 
 # Table of Figures
 
-[Figure 1: Current collection version from netapp.ontap](#Verify-collections-and-if-necessary-upgrade-netapp.ontap-collection)
+[Figure 1: Current collection version from netapp.ontap](#Verify-collections-and-if-necessary-upgrade-netapp\.ontap-collection)
 
 [Figure 2: Workflow Day 1 automation](#Day-1)
 
