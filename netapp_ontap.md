@@ -22,7 +22,7 @@
 
 [Install Ansible](#Install-Ansible)
 
-[Verify collections and if necessary upgrade netapp.ontap collection](#Verify-collections-and-if-necessary-upgrade-netapp\.ontap-collection)
+[Verify collections and if necessary upgrade ontap collection](#Verify-collections-and-if-necessary-upgrade-ontap-collection)
 
 [Install ZAPI Libs for Python](#Install-ZAPI-Libs-for-Python)
 
@@ -82,7 +82,7 @@
 
 # Table of Figures
 
-[Figure 1: Current collection version from netapp.ontap](#Verify-collections-and-if-necessary-upgrade-netapp\.ontap-collection)
+[Figure 1: Current collection version from netapp.ontap](#Verify-collections-and-if-necessary-upgrade-ontap-collection)
 
 [Figure 2: Workflow Day 1 automation](#Day-1)
 
@@ -233,7 +233,7 @@ python version = 3.8.10 (default, Jun 22 2022, 20:18:18) [GCC 9.4.0]
 jinja version = 2.10.1
 libyaml = True
 ```
-### Verify collections and if necessary upgrade netapp.ontap collection
+### Verify collections and if necessary upgrade ontap collection
 
 Verify the actual version of the 
 ```netapp.ontap``` collection as shown in Figure 1 at:
