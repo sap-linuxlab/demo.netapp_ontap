@@ -162,7 +162,7 @@ There are four different scenarios depending on the API being used
 --> This results in using the REST API
 3. We us a module and specify parameters which are available using the REST API **and** ZAPI API. We specify at least one parameter available **only** with ZAPI API.\
 --> This results in using the ZAPI API. If ZAPI API is being used, Ansible will print a warning like this: 
-```[WARNING]: Using ZAPI for na\_ontap\_command, ignoring 'use\_rest: always'.```
+```[WARNING]: Using ZAPI for na_ontap_command, ignoring 'use_rest: always'.```
 4. We us a module and specify parameters which are available using the REST API and ZAPI API. We specify at least one parameter which is available **only** with ZAPI API **and** we specify at least one parameter which is available **only** with REST API.\
 --> This results in an error, because for a module only REST API or ZAPI API can be used
 
@@ -248,8 +248,8 @@ The current collection is version
 ```21.22.0```. Now let's verify which collection version is installed:
 
 ```
-holgerz@HOLGERZ02-PC:~/ansible# ansible-galaxy collection list | grep netapp\
-# /usr/lib/python3/dist-packages/ansible\_collections
+holgerz@HOLGERZ02-PC:~/ansible# ansible-galaxy collection list | grep netapp
+# /usr/lib/python3/dist-packages/ansible_collections
 Collection Version
 ----------------------------- -------
 netapp.aws 21.7.0
@@ -258,12 +258,12 @@ netapp.cloudmanager 21.18.0
 netapp.elementsw 21.7.0
 netapp.ontap 21.20.0
 netapp.storagegrid 21.10.0
-netapp.um\_info 21.8.0
-netapp\_eseries.santricity 1.3.0
+netapp.um_info 21.8.0
+netapp_eseries.santricity 1.3.0
 ```
 
 The default collection search path points to
-```/usr/lib/python3/dist-packages/ansible\_collections``` and 
+```/usr/lib/python3/dist-packages/ansible_collections``` and 
 ```netapp.ontap collection``` is version 21.20.0. Since this is not the current version, we need to upgrade to 
 ```netapp.ontap``` version 
 ```21.22.0``` and place the updated modules into the default collection search path. It is necessary to move the updated collections to the default search path since collections are installed as default in the home directory of the current user in ~/.ansible and if any other user wants to execute Ansible playbooks on the same server he either needs to download the updated collection again or he well us a version of 
@@ -278,19 +278,19 @@ holgerz@HOLGERZ02-PC:~/ansible# ansible-galaxy collection install netapp.ontap
 Starting galaxy collection install process
 Process install dependency map
 Starting collection install process
-Downloading https://galaxy.ansible.com/download/netapp-ontap-21.22.0.tar.gz to /root/.ansible/tmp/ansible-local-107\_ro3sp\_1/tmp1mk2xjz8/netapp-ontap-21.22.0-85bxl69u
-Installing 'netapp.ontap:21.22.0' to '/root/.ansible/collections ansible\_collections/netapp/ontap'
+Downloading https://galaxy.ansible.com/download/netapp-ontap-21.22.0.tar.gz to /root/.ansible/tmp/ansible-local-107_ro3sp_1/tmp1mk2xjz8/netapp-ontap-21.22.0-85bxl69u
+Installing 'netapp.ontap:21.22.0' to '/root/.ansible/collections ansible_collections/netapp/ontap'
 netapp.ontap:21.22.0 was installed successfully
 ```
 2. Remove 
 ```netapp.ontap``` from default collection search path
 ```
-holgerz@HOLGERZ02-PC:~/ansible# rm /usr/lib/python3/dist-packages/ansible\_collections/netapp/ontap
+holgerz@HOLGERZ02-PC:~/ansible# rm /usr/lib/python3/dist-packages/ansible_collections/netapp/ontap
 ```
 3. Move the newly installed netapp.ontap collection from
-```/root/.ansible/collections/ansible\_collections/netapp/ontap``` into the default collection search path
+```/root/.ansible/collections/ansible_collections/netapp/ontap``` into the default collection search path
 ```
-holgerz@HOLGERZ02-PC:~/ansible# mv /root/.ansible/collections/ansible\_collections/netapp/ontap /usr/lib/python3/dist-packages/ansible\_collections/netapp/
+holgerz@HOLGERZ02-PC:~/ansible# mv /root/.ansible/collections/ansible_collections/netapp/ontap /usr/lib/python3/dist-packages/ansible_collections/netapp/
 ```
 
 ### Install ZAPI Libs for Python
@@ -474,12 +474,12 @@ There are three ways when running Playbooks
 2. Use an inventory defined in an inventory file. To run a Playbook using an inventory defined in 
 ```inventory.yml``` execute
 ```
-ansible-playbook -i inventory.yml create\_svm.yml
+ansible-playbook -i inventory.yml create_svm.yml
 ```
 3. Use variables defined in a variable file. To run the Playbook Playbook using an inventory defined in 
-```ontap\_vars.yml``` execute
+```ontap_vars.yml``` execute
 ```
-ansible-playbook create\_svm.yml --extra-vars "@ontap\_vars.yml"
+ansible-playbook create_svm.yml --extra-vars "@ontap_vars.yml"
 ```
 
 An example inventory file is shown in chapter [inventory.yml](#inventory.yml).
