@@ -240,7 +240,7 @@ Verify the actual version of the
 
 [https://docs.ansible.com/ansible/latest/collections/netapp/ontap/index.html](https://docs.ansible.com/ansible/latest/collections/netapp/ontap/index.html)
 
-![](RackMultipart20221124-1-7e8pfc_html_2ff959e5c53868eb.png)
+![Current collection version from netapp.ontap](pictures/picture1.png)
 
 _Figure 1: Current collection version from netapp.ontap_
 
@@ -413,7 +413,7 @@ The necessary steps for Day 1 automation are visualized in Figure 2. The followi
 - [create\_snapshot.yml](#create_snapshot.yml)\
  Take a SnapShot from the newly created volumes
 
-![](RackMultipart20221124-1-7e8pfc_html_be77a18189013a4a.png)
+![Workflow Day 1 automation](pictures/picture2.png)
 
 _Figure 2: Workflow Day 1 automation_
 
@@ -424,7 +424,7 @@ The necessary steps for daily operation are visualized in Figure 3. The followin
 - [restore\_snapshot.yml](#restore_snapshot.yml)\
  Restore a SnapShot
 
-![](RackMultipart20221124-1-7e8pfc_html_7a65b2f345aab652.png)
+![Workflow for daily operation](pictures/picture3.png)
 
 _Figure 3: Workflow for daily operation_
 
@@ -437,7 +437,7 @@ For Day 2 automation we assume, that we need to do SAP system refreshes. The wor
 - [create\_clone.yml](#create_clone.yml)\
  Create FelxClone
 
-![](RackMultipart20221124-1-7e8pfc_html_9767b945efa74671.png)
+![Workflow Day 2 automation](pictures/picture4.png)
 
 _Figure 4: Workflow Day 2 automation_
 
@@ -493,47 +493,364 @@ The key value pairs are self-explaining and fit parameters which are described f
 Here are all needed YAML files.
 
 ## inventory.yml
-
-
+```
+ontapservers:
+  hosts:
+    testcl1-01:
+      hostname: 192.168.71.25 or ansible_host (use inventory_hostname then in playbook)
+      ansible_host: 192.168.71.25
+      username: "holger"
+      password: "your password"
+      keyfile: "/root/ansible/certs/ontap.key"
+      certfile: "/root/ansible/certs/ontap.pem"
+      svmname: "svm-sap03"
+      aggrlist: "data_aggr_0"
+      exportpolicyname: "192er_LAN_SAP"
+      sizeunit: "gb"
+      datavolumesize: "100"
+      datavolumename: "L01_data"
+      logvolumename: "L01_log"
+      logvolumesize: "256"
+      sharedvolumename: "L01_shared"
+      sharedvolumesize: "256"
+      dataaggrname: "data_aggr_0"
+      protocols: "nfs,nfs3"
+      networkrange: "192.168.71.0/24"
+      ruleindex: "100"
+      rorule: "none"
+      rwrule: "any"
+      snapshotpostfix: "_snap_1"
+      clonepostfix: "_clone_1"
+linuxservers:
+   hosts:
+     velociraptor:
+       ansible_host: 192.168.71.229
+       ansible_ssh_user: holger
+       ansible_password: <your password>
+```
 ## ontap\_vars.yml
-
-
+```
+hostname: "192.168.71.25"
+username: "holger"
+password: "your password"
+keyfile: "/root/ansible/certs/ontap.key"
+certfile: "/root/ansible/certs/ontap.pem"
+svmname: "svm-sap03"
+aggrlist: "data_aggr_0"
+exportpolicyname: "192er_LAN_SAP"
+sizeunit: "gb"
+datavolumesize: "100"
+datavolumename: "L01_data"
+logvolumename: "L01_log"
+logvolumesize: "256"
+sharedvolumename: "L01_shared"
+sharedvolumesize: "256"
+dataaggrname: "data_aggr_0"
+protocols: "nfs,nfs3"
+networkrange: "192.168.71.0/24"
+ruleindex: "100"
+rorule: "none"
+rwrule: "any"
+snapshotpostfix: "_snap_1"
+clonepostfix: "_clone_1"
+```
 ## system\_details.yml (ZAPI API and native CLI command)
+```
+---
+
+- name: Get System details 1
+  connection: local
+  collections:
+    - netapp.ontap
+  hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
 
 
+  tasks:
+  - name: Get details of installed cluster
+    na_ontap_command:
+      use_rest: always
+      hostname: "{{ (inventory_)hostname }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+      command: ['system show -instance']
+    register: ontap_return
+  - debug: var=ontap_return
+```
 ## get\_svms.yml (REST API)
+```
+---
 
+- name: Get SVMs
+  collections:
+    - netapp.ontap
+  hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
 
+  tasks:
+  - name: Get details of configured SVMs
+    na_ontap_rest_info:
+      use_rest: always
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+      gather_subset:
+      - svm/svms
+    register: ontap_return
+  - debug: var=ontap_return
+```
 ## create\_svm.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Onboard SVM
+  tasks:
+  - name: Create SVM
+    na_ontap_svm:
+      state: present
+      name: "{{ svmname }}"
+      use_rest: always
+      services:
+        cifs:
+          allowed: false
+        fcp:
+          allowed: false
+        nfs:
+          allowed: true
+          enabled: true
+      aggr_list: "{{ aggrlist }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## set\_svm\_options.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Set SVM Options
+  tasks:
+  - name: Set SVM Options via CLI
+    na_ontap_command:
+      use_rest: always
+      hostname: "{{ (inventory_)hostname }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+      command: ['set advanced -confirmations off; nfs modify -vserver "{{ svmname }}" -tcp-max-xfer-size 1048576; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}"  -snapdir-access true; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -snapshot-policy none; vol modify -vserver "{{ svmname }}" -volume "{{ datavolumename }}" -atime-update false']
+```
 ## create\_export\_policy.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Export Policy
+  tasks:
+  - name: Create Export Policy
+    na_ontap_export_policy_rule:
+      state: present
+      name: "{{ exportpolicyname }}"
+      vserver: "{{ svmname }}"
+      rule_index: "{{ ruleindex }}"
+      client_match: "{{ networkrange }}"
+      protocol: "{{ protocols }}"
+      hostname: "{{ (inventory_)hostname }}"
+      ro_rule : "{{ rorule }}"
+      rw_rule: "{{ rwrule }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## create\_volume.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Onboard FlexVol
+  tasks:
+  - name: Create Volume
+    na_ontap_volume:
+      state: present
+      name: "{{ datavolumename }}"
+      aggregate_name: "{{ dataaggrname }}"
+      use_rest: always
+      size: "{{ datavolumesize }}"
+      size_unit: "{{ sizeunit }}"
+      tiering_policy: none
+      export_policy: "{{ exportpolicyname }}"
+      percent_snapshot_space: 80
+      vserver: "{{ svmname }}"
+      junction_path: '/{{ datavolumename }}'
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## create\_snapshot.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: SnapShot
+  tasks:
+  - name: Create SnapShot
+    na_ontap_snapshot:
+      state: present
+      snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
+      use_rest: always
+      volume: "{{ datavolumename }}"
+      vserver: "{{ svmname }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## restore\_snapshot.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Restore FlexVol
+  tasks:
+  - name: Restore Volume
+    na_ontap_volume:
+      state: present
+      name: "{{ datavolumename }}"
+      use_rest: always
+      snapshot_restore: "{{ datavolumename }}{{ snapshotpostfix }}"
+      vserver: "{{ svmname }}"
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## create\_clone.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Create FlexClone
+  tasks:
+  - name: Clone Volume
+    na_ontap_volume_clone:
+      state: present
+      name: "{{ datavolumename }}{{ clonepostfix }}"
+      use_rest: always
+      vserver: "{{ svmname }}"
+      junction_path: '/{{ datavolumename }}{{ clonepostfix }}'
+      parent_volume: "{{ datavolumename }}"
+      parent_snapshot: "{{ datavolumename }}{{ snapshotpostfix }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## delete\_clone.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Delete FlexClone
+  tasks:
+  - name: Delete Clone
+    na_ontap_volume:
+      state: absent
+      name: "{{ datavolumename }}{{ clonepostfix }}"
+      aggregate_name: "{{ dataaggrname }}"
+      use_rest: always
+      vserver: "{{ svmname }}"
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 ## delete\_volume.yml
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: Delete FlexVol
+  tasks:
+  - name: Delete Volume
+    na_ontap_volume:
+      state: absent
+      name: "{{ datavolumename }}"
+      aggregate_name: "{{ dataaggrname }}"
+      use_rest: always
+      vserver: "{{ svmname }}"
+      wait_for_completion: True
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 
 ## delete\_svm.yml
-
-
+```
+---
+- hosts: ontapservers|localhost - depending if inventory.yml will be used or variables
+  connection: local
+  collections:
+    - netapp.ontap
+  gather_facts: false
+  name: SVM
+  tasks:
+  - name: Delete SVM
+    na_ontap_svm:
+      state: absent
+      name: "{{ svmname }}"
+      use_rest: always
+      aggr_list: "{{ aggrlist }}"
+      hostname: "{{ (inventory_)hostname }}"
+      cert_filepath: "{{ certfile }}"
+      key_filepath: "{{ keyfile }}"
+      https: true
+      validate_certs: false
+```
 # References
 
 [https://netapp.io/2016/11/08/certificate-based-authentication-netapp-manageability-sdk-ontap/](https://netapp.io/2016/11/08/certificate-based-authentication-netapp-manageability-sdk-ontap/)
