@@ -400,7 +400,7 @@ Now that everything is prepared on the Linux server and inside ONTAP we can star
 
 ## Day 1
 
-The necessary steps for Day 1 automation are visualized in Figure 2. The following Playbooks are needed:
+The necessary steps for Day 1 automation are visualized in Figure 2. The following Playbooks are needed for this workflow:
 
 - [create\_svm.yml](#create_svm.yml)\
  If necessary, create a new SVM which will be used for creating the needed volumes.
@@ -419,8 +419,10 @@ _Figure 2: Workflow Day 1 automation_
 
 ## Daily operation
 
-The necessary steps for daily operation are visualized in Figure 3. The following Playbooks are needed:
+The necessary steps for daily operation are visualized in Figure 3. The following Playbooks are needed for this workflow:
 
+- [create\_snapshot.yml](#create_snapshot.yml)\
+ Take a SnapShot from the used volumes
 - [restore\_snapshot.yml](#restore_snapshot.yml)\
  Restore a SnapShot
 
@@ -430,12 +432,16 @@ _Figure 3: Workflow for daily operation_
 
 ## Day 2
 
-For Day 2 automation we assume, that we need to do SAP system refreshes. The workflow for Day 2 automation is visualized in Figure 4. The following Playbooks are needed:
+For Day 2 automation we assume, that we need to do SAP system refreshes. The workflow for Day 2 automation is visualized in Figure 4. The following Playbooks are needed for this workflow:
 
 - [create\_snapshot.yml](#create_snapshot.yml)\
  If necessary, create a SnapShot
 - [create\_clone.yml](#create_clone.yml)\
  Create FelxClone
+- [create\_export\_policy.yml](#create_export_policy.yml)\
+ If necessary, create a new export which will be assigned to the newly created volumes.
+- [create\_snapshot.yml](#create_snapshot.yml)\
+ Take a SnapShot from the newly created cloned volume
 
 ![Workflow Day 2 automation](pictures/picture4.png)
 
