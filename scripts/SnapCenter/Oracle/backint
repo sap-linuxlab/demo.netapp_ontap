@@ -1,0 +1,303 @@
+#!/bin/bash
+#set -x
+# backint interface for NetApp SnapCenter Plugin for Storage: https://automationstore.netapp.com/snap-detail.shtml?packUuid=Storage&packVersion=1.0
+# PoC Version 1.0
+# Date 20200422
+# michael.schlosser@netapp.com
+
+# Enables Snapshot based backup for Data-Backups through brbackup. Note only -m all is supported, as -m full requires a Snapshot based backup of the archives, which is not implemented
+# brbackup -c -u / -t online -m all -p init<SID>_backint.sap 
+
+# Prerequesites:
+#
+#       1.) SnapCenter Plugin for Storage installed on the SAP DB (Oracle) Host (Download: https://automationstore.netapp.com/snap-detail.shtml?packUuid=Storage&packVersion=1.0)
+#
+#       2.) SnapCenter Resources (Plugin for Storage) created: 1. <ORACLE_SID>_data (includes Volumes mounted on /oracle/<SID>/sapdataN), 
+#                                                              2. <ORACLE_SID>_log  (includes Voluumes mounted on /oracle/<SID>/sapprof, /oracle/<SID>/sapreorg, /oracle/<SID>/sapbackup)
+#
+#       3.) Protection for Resources enabled and Policy "storage_daily" is assigned and configured -> Retention of the Backups is configured there!
+#
+#       4.) Deploy backint to /opt/NetApp/backint/backint and link it to SAP Executable directory (e.g. ln -s /opt/NetApp/backint/backint /usr/sap/<SID>/SYS/exe/uc/linuxx86_64/backint)
+#
+#       5.) Create a copy of init<SID>.sap to init<SID>_backint.sap -> change backup_dev_type to util_file
+#
+#       6.) enable execute access to /tmp -> see TMPEXE
+#
+#       7.) Get Token / Adapt Variables
+#
+#       8.) start your first backup: brbackup -c -u / -t online -m all -p init<SID>_backint.sap 
+#
+#       9.) Have fun.....
+#
+#
+# How to get a Token - Example from the PoC Environment:
+#
+# curl -X POST -k --header 'Content-Type: application/json' --header 'Accept: application/json' -d '{ "UserOperationContext": { "User": { "Name": "muccbc\\sapdemo", "Passphrase": "Netapp123", "Rolename": "SnapCenterAdmin" }}}' 'https://sap-snapcenter.muccbc.hq.netapp.com:8146/api/4.1/auth/login?TokenNeverExpires=false'
+#
+# further Information about the NetApp SnapCenter Rest-API use the swagger UI: https://<SCSERVER>:<SCPORT>/swagger/#!/Auth/post_4_3_auth_login
+
+
+#Variable Section - might be imported later - required for the curl API calls
+SCSERVER=testserv1.master.de
+SCPORT=8146
+#TOKEN='Token: KlYxOg==be6i+Wg/27/nUk9BhIa3lKa4KrHKKl92DG6Z41LvAZTNlObQ0pInoipZ3rQxoG6LarIU4yr9RJp+WSByIZb0JZI/3V9kAuazJvSHzAcHppIdIs8LxJ76L5JEdVT8+x0BA4sQYHICisxlMdobIcnJdh9M+PfluuMKeQJkSCxJM4ODevANL0UDPk0tGc/D8CuuPB5b0bLHk3VXBBfYI2h8HNbBzpnga+xWISDj1RXbrBmAHN49dXR8QFb0Q9j4cvL/FJxwug=='
+TOKEN='Token: KlYxOg==gHa7mWH/aUm4G7Ag3rmfGNlF3woDmuTjWxM+PAJjNMem6p9cvZNZHbGXy67bqop16Ug8tk1qbuqi7Td+T3ULxB6dBucp103R0Yv6KiSimiBqF7ob0tuYM1mpx396j8kxGYvG/Q7GaGEEne5+B07e7zcQQGw/tTf84qZeLbw+tFCNdm46I+PdLyX8SiXwA4YInshZooCjVVE7Xa4b8VeqW/XW05jQ/NM5J7sqO68nGwlz1uI8Yjllt3cEMFLS2vIBQ+6LBA=='
+SCPOLICY=Unscheduled
+
+# Fixed Variable Section
+SCPLUGIN=Storage
+SCAPIVERS=4.3
+CONTENT='Content-Type: application/json'
+ACCEPT='Accept: application/json'
+
+# timeout calculated time_out * 10 Seconds e.g. 60*10 Seconds -> 10 Minutes
+TIME_OUT=60
+TIMESTAMP=`date +%y%m%d%H%M%S`
+# Get FQDN of the Plugin Host
+PIHOSTNAME=`hostname --fqdn`
+# get possible resources numbers for Plug-in Host
+PIHOSTRES=`curl -k -X GET -H "$CONTENT" -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/hosts/$PIHOSTNAME/resources" 2>/dev/null|awk -F ',' '{for(i=1; i <= NF; ++i) print $i}'|grep \"Key\" |sort -u|cut -d: -f2`
+
+# ORACLE_SID is defined as an environment variable
+# SnapCenter Resource for DATA must be <ORACLE_SID>_data
+# SnapCenter Resource for LOG must be <ORACLE_SID>_log
+# ORACLE_SID=O01
+SCRESNAMEDATA=${ORACLE_SID}_data
+SCRESNAMELOG=${ORACLE_SID}_log
+
+#Temporary executable if direct call not possible - need execute right to folder /tmp
+TMPEXE=/tmp/backinttemp.$TIMESTAMP
+touch $TMPEXE
+chmod 777 $TMPEXE
+
+#define variables SCRESDATA (SnapCenter Resourcenumber for data) / SCRESLOG (SnapCenter Resrourenumber for log)
+for I in $PIHOSTRES; do
+        CMD="curl -k -X GET -H \"$CONTENT\" -H \"$ACCEPT\" -H \"$TOKEN\" \"https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/$SCPLUGIN/resources/$I\" 2>/dev/null|grep $SCRESNAMEDATA"
+        echo $CMD >$TMPEXE
+        $TMPEXE >/dev/null 2>/dev/null
+        RET=$?
+        if [ $RET = 0 ];then SCRESDATA=$I;fi
+        CMD="curl -k -X GET -H \"$CONTENT\" -H \"$ACCEPT\" -H \"$TOKEN\" \"https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/$SCPLUGIN/resources/$I\" 2>/dev/null|grep $SCRESNAMELOG"
+        echo $CMD >$TMPEXE
+        $TMPEXE >/dev/null 2>/dev/null
+        RET=$?
+        if [ $RET = 0 ]; then SCRESLOG=$I;fi
+done
+
+echo "[ INFO] PoC - Backint Interface for NetApp SnapCenter Plugin for Storage Version: 1.0"
+
+helpFunction()
+{
+   echo ""
+   echo "Usage: $0 -u <SnapCenter_Profile_Name> -f <backup / restore> -i <files_to_backup.lst> -t file -c"
+   echo -e "\t-u SnapCenter Profile Name e.g. O01"
+   echo -e "\t-f type of operation backup / restore"
+   echo -e "\t-i Descriptor File whats to be backuped"
+   echo -e "\t-t file"
+   echo -e "\t-c Doesn´t matter"
+   exit 1 # Exit script after printing help
+}
+
+while getopts "i:f:u:t:c" opt
+do
+   case "$opt" in
+      u ) parameterU="$OPTARG" ;;
+      f ) parameterF="$OPTARG" ;;
+      i ) parameterI="$OPTARG" ;;
+      t ) parameterT="$OPTARG" ;;
+      c ) ;;
+      ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
+   esac
+done
+
+# Print helpFunction in case parameters are empty
+if [ -z "$parameterI" ] || [ -z "$parameterF" ] 
+then
+   echo "[ERROR] Some or all of the parameters are empty";
+   helpFunction
+fi
+
+# Begin script in case all parameters are correct
+
+FILELIST=$parameterI
+
+if [ $parameterF = backup ];then
+
+	# brbackup -m all is divided into two backup runs 1st (FIRST) sapdata, 2nd (LAST) further backup files
+	# Files in SnapCenter Resource Group: <ORACLE_SID>_data will be saved by FIRST
+	# Files in SnapCenter Resource Group: <ORACLE_SID>_log will be saved by LAST
+
+	if [ $BI_CALL = FIRST ]; then
+
+		# Execute backup call via Rest-API
+ 		echo "curl -k -i -X POST -H \"$CONTENT\" -H \"$ACCEPT\" -H \"$TOKEN\" -d '{ \"name\": \"$SCPOLICY\"}' \"https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/$SCPLUGIN/Resources/$SCRESDATA/backup\"" >$TMPEXE
+        	JOB=`$TMPEXE 2>/dev/null |grep -i JobURI`
+		JOBNR=`echo $JOB|grep 'api/jobs/'|awk -F/ '{ print $6 }'|tr -d '\n'`
+		JOBNRWO=${JOBNR%?}
+
+		RESPONSE=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/jobs/$JOBNRWO" 2>/dev/null`
+		echo "[ INFO] SnapCenter Job Number for Backup: $JOBNRWO"
+
+		CHECK=1
+		COUNT=0
+
+		#looking if job is still running
+
+ 		while [ $CHECK = 1 ]; do
+
+			RESPONSE=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/jobs/$JOBNRWO" 2>/dev/null`
+			TEMP=`echo $RESPONSE |grep -Po '"Status":3','"Type":0','"PercentageComplete":100'`;STATUS=$?
+      			if [ $STATUS = 0 ]
+      			then
+         			CHECK=0
+        			RET=0
+
+				for I in `cat $FILELIST`;do
+					echo "#SAVED $TIMESTAMP $I"
+				done
+		
+				echo "[ INFO] Backup was done through SnapCenter: $SCSERVER with Job-ID: $JOBNRWO"
+				echo "[ INFO] Only files on Volumes in SnapCenter Resource: $SCRESNAMEDATA are saved."
+				echo "[ INFO] Files on Volumes in SnapCenter Resource: $SCRESNAMELOG will be saved during the second part of the job."
+
+				# some more output
+				# backup name
+				BACKUPNAME=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/backups?JobId=$JOBNRWO" 2>/dev/null |awk -F"," '{ print $27 }'|awk -F":" '{ print $3 }'`
+				echo "[ INFO] BackupName First Run: $BACKUPNAME"
+				
+      			else
+         			sleep 10
+         			COUNT=`expr $COUNT + 1`
+				echo "[ INFO] SnapCenter Backup still running with JobNr: $JOBNRWO"
+         			if [ $COUNT -gt $TIME_OUT ]
+         			then
+            			RET=1
+				for I in `cat $FILELIST`;do
+					echo "#ERROR $TIMESTAMP $I"
+				done
+            			break
+         			fi
+      			fi
+   		done
+
+
+	fi
+	if [ $BI_CALL = LAST ]; then
+
+ 		echo "curl -k -i -X POST -H \"$CONTENT\" -H \"$ACCEPT\" -H \"$TOKEN\" -d '{ \"name\": \"$SCPOLICY\"}' \"https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/$SCPLUGIN/Resources/$SCRESLOG/backup\"" >$TMPEXE
+        	JOB=`$TMPEXE 2>/dev/null |grep -i JobURI`
+
+                JOBNR=`echo $JOB|grep 'api/jobs/'|awk -F/ '{ print $6 }'|tr -d '\n'`
+                JOBNRWO=${JOBNR%?}
+
+                RESPONSE=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/jobs/$JOBNRWO" 2>/dev/null`
+		echo "[ INFO] SnapCenter Job Number for Backup: $JOBNRWO"
+
+                CHECK=1
+                COUNT=0
+        
+                while [ $CHECK = 1 ]; do
+        
+                        RESPONSE=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/jobs/$JOBNRWO" 2>/dev/null`
+                        TEMP=`echo $RESPONSE |grep -Po '"Status":3','"Type":0','"PercentageComplete":100'`;STATUS=$?
+                        if [ $STATUS = 0 ]
+                        then
+                                CHECK=0
+                                RET=0
+
+                                for I in `cat $FILELIST`;do
+                                        echo "#SAVED $TIMESTAMP $I"
+                                done
+
+				echo "[ INFO] Backup was done through SnapCenter: $SCSERVER with Job-ID: $JOBNRWO"
+				echo "[ INFO] Only files on Volumes in SnapCenter Resource: $SCRESNAMELOG are saved."
+				
+				# some more output
+				# backup name
+				BACKUPNAME=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/backups?JobId=$JOBNRWO" 2>/dev/null |awk -F"," '{ print $27 }'|awk -F":" '{ print $3 }'`
+				echo "[ INFO] BackupName Last Run: $BACKUPNAME"
+                        else
+                                sleep 10
+                                COUNT=`expr $COUNT + 1`
+				echo "[ INFO] SnapCenter Backup still running with JobNr: $JOBNRWO"
+                                if [ $COUNT -gt $TIME_OUT ]
+                                then
+                                RET=1
+                                for I in `cat $FILELIST`;do
+                                        echo "#ERROR $TIMESTAMP $I"
+                                done
+                                break
+                                fi
+                        fi
+                done
+	fi
+
+fi
+
+if [ $parameterF = restore ];then
+
+	# doing the restore -> backup.log must be available for parsing which snapshot is required
+
+	RESTORETIME=`cat $FILELIST| cut -d" " -f1|sort -u`
+	BACKUPLOG=`cat $SAPBACKUP/$BI_RUN |grep Files | cut -d":" -f2 | cut -d" " -f2`
+	BACKUPTORESTORE=`cat $SAPBACKUP/$BACKUPLOG | grep BackupName | grep First | cut -d'"' -f2`
+
+	echo "[ INFO] Restore will be from RESTORETIME: $RESTORETIME"
+	echo "[ INFO] Original BACKUPLOG: $BACKUPLOG"
+	echo "[ INFO] SnapCenter Backup to Restore: $BACKUPTORESTORE"
+
+	# if you want to to do a  VBSR (which might not make sense, when restoring an older backup) this section could be activated
+	#	echo "curl -k -i -X POST -H \"$CONTENT\" -H \"$ACCEPT\" -H \"$TOKEN\" -d '{ \"BackupInfo\": {\"PrimaryBackup\": {\"BackupName\":\"$BACKUPTORESTORE\"} },  \"RestoreLastBackup\": 0,  \"Configuration\": {\"\$type\": \"SMCoreContracts.SmSCRestoreConfiguration, SMCoreContracts\",\"RestoreScope\": \"FileLevelRestore\",\"IsFastRestore\": \"False\"}, \"PluginCode\":\"SCC\"}' \"https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/$SCPLUGIN/Resources/$SCRESDATA/restore\"" >$TMPEXE
+
+	# decided to go for SFSR (Singe File Snap Restore)
+
+	RESTOREPATH=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/Storage/resources/$SCRESDATA" 2>/dev/null| awk -F ',' '{for(i=1; i <= NF; ++i) print $i}' | grep FullPath | cut -d'"' -f4`
+
+	echo "curl -k -i -X POST -H \"$CONTENT\" -H \"$ACCEPT\" -H \"$TOKEN\" -d '{ \"BackupInfo\": {\"PrimaryBackup\": {\"BackupName\":\"$BACKUPTORESTORE\"} },  \"RestoreLastBackup\": 0,  \"Configuration\": {\"\$type\": \"SMCoreContracts.SmSCRestoreConfiguration, SMCoreContracts\",\"RestoreScope\": \"FileLevelRestore\",\"IsFastRestore\": \"False\",\"Path\":[], \"SelectedVolumeQtreeListForAllFileRestore\": \"$RESTOREPATH\"}, \"PluginCode\":\"SCC\"}' \"https://$SCSERVER:$SCPORT/api/$SCAPIVERS/plugins/$SCPLUGIN/Resources/$SCRESDATA/restore\"" >$TMPEXE
+
+	JOB=`$TMPEXE 2>/dev/null |grep -i JobURI`
+	JOBNR=`echo $JOB|grep 'api/jobs/'|awk -F/ '{ print $6 }'|tr -d '\n'`
+	JOBNRWO=${JOBNR%?}
+
+	echo "[ INFO] SnapCenter Job Number for Restore: $JOBNRWO"
+        RESPONSE=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/jobs/$JOBNRWO" 2>/dev/null`
+
+        CHECK=1
+        COUNT=0
+
+	while [ $CHECK = 1 ]; do
+
+			RESPONSE=`curl -k -X GET -H "$ACCEPT" -H "$TOKEN" "https://$SCSERVER:$SCPORT/api/$SCAPIVERS/jobs/$JOBNRWO" 2>/dev/null`
+			TEMP=`echo $RESPONSE |grep -Po '"Status":3','"Type":1','"PercentageComplete":100'`;STATUS=$?
+      			if [ $STATUS = 0 ]
+      			then
+         			CHECK=0
+        			RET=0
+
+					for I in `cat $FILELIST| cut -d" " -f2`;do
+					echo "#RESTORED $RESTORETIME $I"
+					done
+				
+      			else
+         			sleep 10
+         			COUNT=`expr $COUNT + 1`
+				echo "[ INFO] SnapCenter Restore still running with JobNr: $JOBNRWO"
+         			if [ $COUNT -gt $TIME_OUT ]
+         			then
+            				RET=1
+					echo "[ INFO] SnapCenter Restore didn´t finished with the given TimeOut" 
+					for I in `cat $FILELIST| cut -d" " -f2`;do
+						echo "#ERROR $I"
+					done
+            				break
+         			fi
+      			fi
+   	done
+	
+fi
+
+rm $TMPEXE
+exit 0
+
+
+
