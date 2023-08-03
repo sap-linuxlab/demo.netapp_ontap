@@ -1,7 +1,7 @@
 #! /bin/bash
 #########################################################################
 # Version 1.1: 03/2022: Fixes in recovery logic with SID <> tenant name
-# Version 2.0: 07/2027: - Same script can be used for SnapCenter and BlueXP backup recovery for HANA on ANF
+# Version 2.0: 07/2023: - Same script can be used for SnapCenter and BlueXP backup recovery for HANA on ANF
 #                       - Support of NFSv3, NFSv4.1 and SAN configured in SID specific cfg file     
 #                       - List of tenants are read from HANA after system DB recovery
 #                       - All tenants will then be recovered
