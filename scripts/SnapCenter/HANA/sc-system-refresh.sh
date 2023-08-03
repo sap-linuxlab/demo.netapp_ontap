@@ -1,27 +1,53 @@
 #! /bin/bash
 #########################################################################
 # Version 1.1: 03/2022: Fixes in recovery logic with SID <> tenant name
+# Version 2.0: 07/2027: - Same script can be used for SnapCenter and BlueXP backup recovery for HANA on ANF
+#                       - Support of NFSv3, NFSv4.1 and SAN configured in SID specific cfg file     
+#                       - List of tenants are read from HANA after system DB recovery
+#                       - All tenants will then be recovered
+#                       - Additional error handling at multiple places
 #########################################################################
 
+#########################################################################
+# Required environment variables to be provided by caller
+#########################################################################
+# CLONED_VOLUMES_MOUNT_PATH: For NFS the script derives the IP address
+# and the name of the cloned volume from the environment variable provided
+# by SnapCenter and BlueXP backup and recovery 
+# Example: CLONED_VOLUMES_MOUNT_PATH=192.168.175.117:/SS1_data_mnt00001_Clone_05112206115489411
+#
+# VOLUMES, jobId: For SAN the script gets the source volume name and the SnapCenter JobID
+# from the environment provided by SnapCenter. The LUN path is then derived from
+# the SnapCenter job log SC_LOG_PATH="/opt/NetApp/snapcenter/scc/logs"
+#########################################################################
+
+#########################################################################
+# HANA system requirements
+#########################################################################
+# The data volume must be mounted at: MOUNT_POINT="/hana/data/$SID/mnt00001"
+# (can be adapted in get_config_file function)
+# HANA single host MDC systems with single or multiple tenants are supported
+# HANA multiple host systems are not supported
+#########################################################################
+
+
+########################################################################
 VERBOSE=NO
 MY_NAME="`basename $0`"
 BASE_SCRIPT_DIR="`dirname $0`"
-VERSION="1.1"
+VERSION="2.0"
 
 #########################################################################
 # Generic parameters
 #########################################################################
 
-MOUNT_OPTIONS_NFS="rw,vers=3,hard,timeo=600,rsize=1048576,wsize=1048576,intr,noatime,nolock"
-MOUNT_OPTIONS_SAN="relatime,inode64"
-
 # Timeout to start the database in 10sec intervals
 # E.g. 3min = 180sec, TIME_OUT_STOP=18
-TIME_OUT_START=18
+TIME_OUT_START=60
 
 # Timeout to stop the database in 10sec intervals
 # E.g. 3min = 180sec, TIME_OUT_STOP=18
-TIME_OUT_STOP=18
+TIME_OUT_STOP=60
 
 # log file writer
 #################################
@@ -55,6 +81,7 @@ usage()
 #################################
 get_config_file()
 {
+   RET=0
    CONFIG_FILE="$BASE_SCRIPT_DIR/sc-system-refresh-"$SID".cfg"
    if [ ! -e $CONFIG_FILE ]
    then
@@ -74,10 +101,21 @@ get_config_file()
          touch $LOGFILE
          chmod 777 $LOGFILE
       fi
-      HANA_ARCHITECTURE=`/usr/bin/env | grep HANA_DATABASE_TYPE | awk -F = {'print $2'}`
+      case $PROTOCOL in
+         "NFSv3")
+            MOUNT_OPTIONS_NFS="rw,nfsvers=3,hard,timeo=600,rsize=1048576,wsize=262144,noatime,nolock 0 0";;
+         "NFSv4.1")
+            MOUNT_OPTIONS_NFS="rw,nfsvers=4.1,hard,timeo=600,rsize=1048576,wsize=262144,noatime,lock 0 0 ";;
+         "SAN")
+            MOUNT_OPTIONS_SAN="relatime,inode64";;
+         *)
+            echo "Error: Protocol not configured properly in $CONFIG_FILE"
+            write2log "Error: Protocol not configured properly in $CONFIG_FILE"
+	    RET=1;;
+      esac
+
       # Save env for debugging 
       /usr/bin/env > $ENVFILE 
-      RET=0
    fi
 }
 
@@ -88,7 +126,7 @@ umount_data_volume()
    write2log "Unmounting data volume."
    if [ $PROTOCOL = "SAN" ]
    then
-      UUID=`cat /etc/fstab | grep \/hana\/data\/$SID | awk -F \/ {'print $4'}`
+      UUID=`cat /etc/fstab | grep \/hana\/data | awk -F \/ {'print $4'}`
    fi
 
    UMOUNT_CMD="umount $MOUNT_POINT"
@@ -100,7 +138,7 @@ umount_data_volume()
       write2log "Unmount operation failed."
    else
       write2log "Deleting /etc/fstab entry."
-      sed -i "/\/hana\/data\/$SID/d" /etc/fstab
+      sed -i "/\/hana\/data/d" /etc/fstab
       write2log "Data volume unmounted successfully."
    fi
 
@@ -128,6 +166,17 @@ umount_data_volume()
 #################################
 wait_for_status()
 {
+   CMD="sapcontrol -nr $INSTANCENO -function GetSystemInstanceList | grep HDB | awk -F , {'print \$7'}"
+   STATUS=`su - $SIDADM -c "$CMD"`
+   STATUS=`echo $STATUS | sed 's/ *$//g'`
+   if [ "$STATUS" != "GRAY" -a "$STATUS" != "YELLOW" -a "$STATUS" != "GREEN" ]
+   then
+      write2log "Error: Unexpected status from sapcontrol -nr $INSTANCENO -function GetSystemInstanceList."	   
+      write2log "Status: $STATUS"
+      RET=2
+      return
+   fi
+
    EXPECTED_STATUS=$1
    TIME_OUT=$2
    CHECK=1
@@ -146,7 +195,7 @@ wait_for_status()
          if [ $COUNT -gt $TIME_OUT ]
          then
             RET=1
-            break
+            CHECK=0 
          fi
       fi
    done
@@ -165,9 +214,17 @@ stop_hana_db()
    wait_for_status GRAY $TIME_OUT_STOP 
    if [ $RET -gt 0 ]
    then
-      write2log "Timeout error: SAP HANA database not stopped configured timeout."
-      echo "Timeout error: SAP HANA database not stopped within configured timeout."
-      RET=1
+      if [ $RET = 1 ]
+      then
+         write2log "Timeout error: SAP HANA database not stopped configured timeout."
+         echo "Timeout error: SAP HANA database not stopped within configured timeout."
+         RET=1
+      elif [ $RET = 2 ]
+      then
+         write2log "Error in sapcontrol execution."
+         echo "Error in sapcontrol execution."
+         RET=2
+      fi
    else
       write2log "SAP HANA database is stopped."
       RET=0
@@ -211,12 +268,12 @@ discover_lun()
 mount_data_volume()
 {
    write2log "Adding entry in /etc/fstab."
-   if [ $PROTOCOL = "NFS" ]
+   if [ $PROTOCOL = "NFSv3" -o "NFSv4.1" ]
    then
       # Get SVM IP and junction path from environment provided by SC
-      STORAGE=`/usr/bin/env | grep CLONED_VOLUMES_MOUNT_PATH | awk -F = {'print $2'} | awk -F : {'print $1'}`
-      JUNCTION_PATH=`/usr/bin/env | grep CLONED_VOLUMES_MOUNT_PATH | awk -F = {'print $2'} | awk -F : {'print $2'}`
-      LINE="$STORAGE":"$JUNCTION_PATH $MOUNT_POINT nfs $MOUNT_OPTIONS_NFS 0 0"
+      STORAGE=`echo $CLONED_VOLUMES_MOUNT_PATH | awk -F : {'print $1'}`
+      JUNCTION_PATH=`echo $CLONED_VOLUMES_MOUNT_PATH |  awk -F : {'print $2'}`
+      LINE="$STORAGE":"$JUNCTION_PATH $MOUNT_POINT nfs $MOUNT_OPTIONS_NFS"
       write2log "$LINE"
       echo $LINE >> /etc/fstab
    fi
@@ -246,17 +303,11 @@ mount_data_volume()
 #################################
 recover_database()
 {
-   if [ $HANA_ARCHITECTURE="MULTIPLE_CONTAINERS" ]
-   then
-      write2log "Recover system database."
-   else
-      write2log "Recover single container database."
-   fi
+   write2log "Recover system database."
 
    SQL="RECOVER DATA USING SNAPSHOT CLEAR LOG"
    RECOVER_CMD="/usr/sap/$SID/$HDBNO/exe/Python/bin/python /usr/sap/$SID/$HDBNO/exe/python_support/recoverSys.py --command \"$SQL\""
    write2log "$RECOVER_CMD" 
-#   su - $SIDADM -c "$RECOVER_CMD >> $LOGFILE 2>&1"
    su - $SIDADM -c "$RECOVER_CMD"
 
    write2log "Wait until SAP HANA database is started ...." 
@@ -267,54 +318,59 @@ recover_database()
       echo "Timeout error: SAP HANA database not started within configured timeout."
       RET=1
    else
-      write2log "SAP HANA database is started."
+      write2log "HANA system database started."
       RET=0
    fi
 
-   if [ $HANA_ARCHITECTURE="MULTIPLE_CONTAINERS" -a $RET -eq 0 ]
+   if [ $RET -eq 0 ]
    then
-      SECOND_TENANT_IN_LIST=`/usr/bin/env | grep TENANT_DATABASE_NAMES | awk -F = '{print $2}' | awk -F , '{print $2}'`
-      if [ $SECOND_TENANT_IN_LIST ]
-      then 
-         write2log "Source system contains more than one tenant, recovery will only be executed for the first tenant."
-         TENANT_LIST=`/usr/bin/env | grep TENANT_DATABASE_NAMES | awk -F = '{print $2}'`
-	 write2log "List of tenants: $TENANT_LIST" 
-         TENANT=`/usr/bin/env | grep TENANT_DATABASE_NAMES | awk -F = '{print $2}' | awk -F , '{print $1}'`
-      else
-         SOURCE_TENANT=`/usr/bin/env | grep TENANT_DATABASE_NAMES | awk -F = '{print $2}'`
-         SOURCE_SID=`/usr/bin/env | grep TENANT_DATABASE_NAMES | sed -e "s;^MDC.;;g" | awk -F _ '{print $1}'` 
-         write2log "Source Tenant: $SOURCE_TENANT"
-         write2log "Source SID: $SOURCE_SID"
-	 if [ "$SOURCE_TENANT" != "$SOURCE_SID" ]
-	 then
-            TENANT=$SOURCE_TENANT
-	    write2log "Source system has a single tenant: $TENANT"
-	    write2log "Target tenant will have the same name. Tenant rename can be excuted after recovery, if required."
-	 else
-            TENANT=$SID
-	    write2log "Source system has a single tenant and tenant name is identical to source SID: $SOURCE_TENANT"
-	    write2log "Target tenant will have the same name as target SID: $SID."
-         fi
-      fi
-      write2log "Recover tenant database "$TENANT"." 
-      SQL="RECOVER DATA FOR $TENANT USING SNAPSHOT CLEAR LOG"
-      RECOVER_CMD="/usr/sap/$SID/SYS/exe/hdb/hdbsql -U $KEY $SQL"
-      write2log "$RECOVER_CMD"
-      su - $SIDADM -c "$RECOVER_CMD >> $LOGFILE 2>&1"
-      write2log "Checking availability of Indexserver for tenant "$TENANT"."
-      CMD="sapcontrol -nr $INSTANCENO -function GetProcessList | grep Indexserver-$TENANT | awk -F , '{print \$3}'"
-      RETSTR=`su - $SIDADM -c "$CMD"`
-      RETSTR=`echo $RETSTR | sed 's/^ *//g'`
-      if [ "$RETSTR" != "GREEN" ]
+      write2log "Checking connection to system database."
+      HDB_SQL_CMD="/usr/sap/$SID/SYS/exe/hdb/hdbsql"
+      SQL="select * from sys.m_databases;"
+      TEST_CMD="$HDB_SQL_CMD -U $KEY '$SQL'"
+      write2log "$TEST_CMD"
+      su - $SIDADM -c "$TEST_CMD >> $LOGFILE 2>&1"
+      RET=$?
+      if [ $RET -gt 0 ]
       then
-         write2log "Recovery of tenant database $TENANT failed."
-         echo "Recovery of tenant database $TENANT failed."
-         write2log "Status: $RETSTR"
-         RET=1
+         write2log "Error: Cannot connect to system databse using $KEY"
       else
-         write2log "Recovery of tenant database $TENANT succesfully finished."
-         write2log "Status: $RETSTR"
-         RET=0
+         write2log "Succesfully connected to system database."
+      fi
+      if [ $RET -eq 0 ]
+      then
+         HDB_SQL_CMD="/usr/sap/$SID/SYS/exe/hdb/hdbsql"
+         TENANT_LIST=$(su - $SIDADM -c "$HDB_SQL_CMD -U $KEY SELECT DATABASE_NAME from M_DATABASES WHERE ACTIVE_STATUS=\'NO\'"| grep -oe '"\w*"'|sed -e 's/"//g')
+         write2log "Tenant databases to recover: $TENANT_LIST"
+         if [ -z "$TENANT_LIST" ]
+         then
+	   write2log "There are no inactive tenants to recover"
+         else 
+	    write2log "Found inactive tenants($TENANT_LIST) and starting recovery"
+            for TENANT in $TENANT_LIST
+            do
+               write2log "Recover tenant database "$TENANT"." 
+               SQL="RECOVER DATA FOR $TENANT USING SNAPSHOT CLEAR LOG"
+               RECOVER_CMD="$HDB_SQL_CMD -U $KEY $SQL"
+               write2log "$RECOVER_CMD"
+               su - $SIDADM -c "$RECOVER_CMD >> $LOGFILE 2>&1"
+               write2log "Checking availability of Indexserver for tenant "$TENANT"."
+               CMD="sapcontrol -nr $INSTANCENO -function GetProcessList | grep Indexserver-$TENANT | awk -F , '{print \$3}'"
+               RETSTR=`su - $SIDADM -c "$CMD"`
+               RETSTR=`echo $RETSTR | sed 's/^ *//g'`
+               if [ "$RETSTR" != "GREEN" ]
+               then
+                  write2log "Recovery of tenant database $TENANT failed."
+                  echo "Recovery of tenant database $TENANT failed."
+                  write2log "Status: $RETSTR"
+                  RET=1
+               else
+                  write2log "Recovery of tenant database $TENANT succesfully finished."
+                  write2log "Status: $RETSTR"
+                  RET=0
+               fi
+            done
+         fi
       fi
    fi
 }
@@ -339,7 +395,7 @@ if [ "$2" ]
 then
    SID=$2
    get_config_file
-if [ $RET -gt 0 ]
+   if [ $RET -gt 0 ]
    then
       exit 1
    fi
@@ -349,41 +405,54 @@ else
    exit 1
 fi
 
-write2log "Version: $VERSION"
+
+write2log "***************************************************************************************"
+write2log "Script version: $VERSION"
 
 case $TASK in
 
    "shutdown")
+   write2log "********************** Starting script: shutdown operation **************************"
    stop_hana_db
+   write2log "********************** Finished script: shutdown operation **************************"
    exit $RET
    ;;
 
    "umount")
+   write2log "********************** Starting script: umount operation **************************"
    umount_data_volume
+   write2log "********************** Finished script: umount operation **************************"
    exit $RET
    ;;
 
    "recover")
+   write2log "********************** Starting script: recovery operation **************************"
    recover_database
+   write2log "********************** Finished script: recovery operation **************************"
+
    # For debugging of recovery issues, set exit code to 0
    # This avoids cleanup process of SnapCenter
-   exit 0 
-   #exit $RET
+   # exit 0 
+   exit $RET
    ;;
 
    "mount") 
-   if [ $PROTOCOL = "NFS" ]
+   if [ $PROTOCOL = "NFSv3" -o "NFSv4,1" ]
    then
+      write2log "********************** Starting script: mount operation **************************"
       mount_data_volume
+      write2log "********************** Finished script: mount operation **************************"
       # For debugging, set exit code to 0
       # This avoids cleanup process of SnapCenter
-      exit 0 
-      #exit $RET
+      # exit 0 
+      exit $RET
    fi 
    if [ $PROTOCOL = "SAN" ]
    then
+      write2log "********************** Starting script: mount operation **************************"
       discover_lun
       mount_data_volume
+      write2log "********************** Finished script: mount operation **************************"
       # For debugging, set exit code to 0
       # This avoids cleanup process of SnapCenter
       # exit 0 
