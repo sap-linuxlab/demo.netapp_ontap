@@ -1,22 +1,25 @@
 #! /bin/bash
 #########################################################################
 # Version 1.1: 03/2022: Fixes in recovery logic with SID <> tenant name
-# Version 2.0: 07/2023: - Same script can be used for SnapCenter and BlueXP backup recovery for HANA on ANF
+# Version 2.0: 07/2027: - Same script can be used for SnapCenter and BlueXP backup recovery for HANA on ANF
 #                       - Support of NFSv3, NFSv4.1 and SAN configured in SID specific cfg file     
 #                       - List of tenants are read from HANA after system DB recovery
 #                       - All tenants will then be recovered
 #                       - Additional error handling at multiple places
+# Version 2.1: 08/2023: - Validation and fixes for SAN support
+#                       - Minor general fixes
 #########################################################################
 
 #########################################################################
 # Required environment variables to be provided by caller
 #########################################################################
-# CLONED_VOLUMES_MOUNT_PATH: For NFS the script derives the IP address
-# and the name of the cloned volume from the environment variable provided
-# by SnapCenter and BlueXP backup and recovery 
+# CLONED_VOLUMES_MOUNT_PATH: 
+# For NFS the script derives the junction path from the environment
+# variable. The variable is provided by SnapCenter and BlueXP
 # Example: CLONED_VOLUMES_MOUNT_PATH=192.168.175.117:/SS1_data_mnt00001_Clone_05112206115489411
 #
-# VOLUMES, jobId: For SAN the script gets the source volume name and the SnapCenter JobID
+# VOLUMES, jobId: 
+# For SAN the script gets the cloned volume name and the SnapCenter JobID
 # from the environment provided by SnapCenter. The LUN path is then derived from
 # the SnapCenter job log SC_LOG_PATH="/opt/NetApp/snapcenter/scc/logs"
 #########################################################################
@@ -25,9 +28,29 @@
 # HANA system requirements
 #########################################################################
 # The data volume must be mounted at: MOUNT_POINT="/hana/data/$SID/mnt00001"
-# (can be adapted in get_config_file function)
-# HANA single host MDC systems with single or multiple tenants are supported
-# HANA multiple host systems are not supported
+# (can be adapted in script in get_config_file() function)
+# 
+# <sid>adm user must be configured with Bourne shell, c-shell is not supported
+#
+# Supported HANA system configurations:
+# - single host MDC systems with single or multiple tenants
+# - HSR primary host can be used as a source system (target can be HSR-enabled or not)
+# 
+# Unsupported HANA system configurations:
+# - HANA multiple host systems
+# - HANA systems with multiple partitions
+#########################################################################
+
+#########################################################################
+# Validated OS and SnapCenter releases
+#########################################################################
+# The script has been validated with
+# - SnapCenter 4.8P1 and SAN: SLES 15 SP3
+# - SnapCenter 4.8 and NFS: SLES 15 SP1
+# - BlueXP HANA on ANF with NFS: SLES 15 SP4
+# Other SLES releases will most probably work as well, but requires testing.
+# 
+# RHEL has not been validated. 
 #########################################################################
 
 
@@ -35,7 +58,7 @@
 VERBOSE=NO
 MY_NAME="`basename $0`"
 BASE_SCRIPT_DIR="`dirname $0`"
-VERSION="2.0"
+VERSION="2.1"
 
 #########################################################################
 # Generic parameters
@@ -43,11 +66,11 @@ VERSION="2.0"
 
 # Timeout to start the database in 10sec intervals
 # E.g. 3min = 180sec, TIME_OUT_STOP=18
-TIME_OUT_START=60
+TIME_OUT_START=18
 
 # Timeout to stop the database in 10sec intervals
 # E.g. 3min = 180sec, TIME_OUT_STOP=18
-TIME_OUT_STOP=60
+TIME_OUT_STOP=18
 
 # log file writer
 #################################
@@ -123,12 +146,6 @@ get_config_file()
 #################################
 umount_data_volume()
 {
-   write2log "Unmounting data volume."
-   if [ $PROTOCOL = "SAN" ]
-   then
-      UUID=`cat /etc/fstab | grep \/hana\/data | awk -F \/ {'print $4'}`
-   fi
-
    UMOUNT_CMD="umount $MOUNT_POINT"
    write2log "$UMOUNT_CMD" 
    $UMOUNT_CMD
@@ -141,25 +158,27 @@ umount_data_volume()
       sed -i "/\/hana\/data/d" /etc/fstab
       write2log "Data volume unmounted successfully."
    fi
+}
 
-   if [ $PROTOCOL = "SAN" ]
-   then
-      write2log "Removing multipath map and device files."
-      LUN_PATH=`cat $BASE_SCRIPT_DIR/LUN_PATH.txt`
-      rm $BASE_SCRIPT_DIR/DEVICE_NO.txt
-      /usr/sbin/sanlun lun show | grep $LUN_PATH | awk {'print $3'} | awk -F \/ {'print $3'} | while read DEVICE;
-      do
-         write2log "$DEVICE"
-         DEVICE_NO=`multipath -ll | grep $DEVICE | awk {'print $2'}`
-         echo $DEVICE_NO >> $BASE_SCRIPT_DIR/DEVICE_NO.txt
-      done
-      /sbin/multipath -f $UUID
-      cat $BASE_SCRIPT_DIR/DEVICE_NO.txt | while read DEVICE_NO;
-      do
-         write2log "echo 1 > /sys/bus/scsi/devices/$DEVICE_NO/delete"
-         echo 1 > /sys/bus/scsi/devices/$DEVICE_NO/delete
-      done
-   fi
+# Cleanup SAN configuration 
+#################################
+cleanup_luns()
+{
+   write2log "Removing multipath map and device files."
+   LUN_PATH=`cat $BASE_SCRIPT_DIR/LUN_PATH.txt`
+   rm $BASE_SCRIPT_DIR/DEVICE_NO.txt
+   /usr/sbin/sanlun lun show | grep $LUN_PATH | awk {'print $3'} | awk -F \/ {'print $3'} | while read DEVICE;
+   do
+      write2log "$DEVICE"
+      DEVICE_NO=`multipath -ll | grep $DEVICE | awk -F - {'print $2'} | awk {'print $1'}`
+      echo $DEVICE_NO >> $BASE_SCRIPT_DIR/DEVICE_NO.txt
+   done
+   /sbin/multipath -f $UUID
+   cat $BASE_SCRIPT_DIR/DEVICE_NO.txt | while read DEVICE_NO;
+   do
+      write2log "echo 1 > /sys/bus/scsi/devices/$DEVICE_NO/delete"
+      echo 1 > /sys/bus/scsi/devices/$DEVICE_NO/delete
+   done
 }
 
 # Get status of HANA database 
@@ -238,14 +257,14 @@ discover_lun()
    write2log "Discover LUN and get UUID."
    SC_LOG_PATH="/opt/NetApp/snapcenter/scc/logs"
 
-   write2log "Get source volume name and SnapCenter job ID from environment."
-   SOURCE_VOLUME=`/usr/bin/env | grep "VOLUMES=" | awk -F = {'print $2'} | awk -F : {'print $2'}`
+   write2log "Get cloned volume name and SnapCenter job ID from environment."
+   CLONED_VOLUME=`/usr/bin/env | grep "CLONED_VOLUMES_NAME=" | awk -F = {'print $2'}`
    JOB_ID=`/usr/bin/env | grep "jobId=" | awk -F = {'print $2'}`
-   write2log "Source volume: $SOURCE_VOLUME"
+   write2log "Cloned volume: $CLONED_VOLUME"
    write2log "SnapCenter job ID: $JOB_ID"
 
    write2log "Get volume and LUN name from SnapCenter log file."
-   LUN_PATH=`grep \<LunPath\> $SC_LOG_PATH/hana_$JOB_ID.log | grep $SOURCE_VOLUME | grep -v \/$SOURCE_VOLUME\/ | tr -d " " | uniq | awk -F \> {'print $2'} | awk -F \< {'print $1'}`
+   LUN_PATH=`grep $CLONED_VOLUME $SC_LOG_PATH/hana_$JOB_ID.log | tr -d " " | grep LunPath | uniq | awk -F \< {'print $2'} | awk -F \> {'print $2'}`
    write2log "$LUN_PATH"
    echo $LUN_PATH > $BASE_SCRIPT_DIR/LUN_PATH.txt
 
@@ -253,11 +272,10 @@ discover_lun()
    /usr/bin/rescan-scsi-bus.sh -a
 
    write2log "Get device name."
-   /usr/sbin/sanlun lun show | grep $LUN_PATH >> /root/env_$JOB_ID.data
    DEVICE=`/usr/sbin/sanlun lun show | grep $LUN_PATH | head -n1 | awk {'print $3'}`
 
    write2log "Get UUID of LUN."
-   UUID=`/lib/udev/scsi_id -g -u -d $DEVICE`
+   UUID=`/usr/lib/udev/scsi_id -g -u -d $DEVICE`
 
    write2log "Device: $DEVICE"
    write2log "LUN UUID: $UUID"
@@ -268,7 +286,7 @@ discover_lun()
 mount_data_volume()
 {
    write2log "Adding entry in /etc/fstab."
-   if [ $PROTOCOL = "NFSv3" -o "NFSv4.1" ]
+   if [ $PROTOCOL = "NFSv3" -o $PROTOCOL = "NFSv4.1" ]
    then
       # Get SVM IP and junction path from environment provided by SC
       STORAGE=`echo $CLONED_VOLUMES_MOUNT_PATH | awk -F : {'print $1'}`
@@ -406,29 +424,40 @@ else
 fi
 
 
-write2log "***************************************************************************************"
+write2log "**********************************************************************************"
 write2log "Script version: $VERSION"
 
 case $TASK in
 
    "shutdown")
-   write2log "********************** Starting script: shutdown operation **************************"
+   write2log "******************* Starting script: shutdown operation **************************"
    stop_hana_db
-   write2log "********************** Finished script: shutdown operation **************************"
+   write2log "******************* Finished script: shutdown operation **************************"
    exit $RET
    ;;
 
    "umount")
-   write2log "********************** Starting script: umount operation **************************"
-   umount_data_volume
-   write2log "********************** Finished script: umount operation **************************"
-   exit $RET
+   if [ $PROTOCOL = "NFSv3" -o $PROTOCOL = "NFSv4.1" ]
+   then
+      write2log "******************* Starting script: NFS umount operation ************************"
+      umount_data_volume
+      write2log "******************* Finished script: NFS umount operation ************************"
+      exit $RET
+   fi
+   if [ $PROTOCOL = "SAN" ]
+   then
+      write2log "******************* Starting script: SAN umount operation ************************"
+      umount_data_volume
+      cleanup_luns
+      write2log "******************* Finished script: SAN umount operation ************************"
+      exit $RET
+   fi
    ;;
 
    "recover")
-   write2log "********************** Starting script: recovery operation **************************"
+   write2log "******************* Starting script: recovery operation **************************"
    recover_database
-   write2log "********************** Finished script: recovery operation **************************"
+   write2log "******************* Finished script: recovery operation **************************"
 
    # For debugging of recovery issues, set exit code to 0
    # This avoids cleanup process of SnapCenter
@@ -437,11 +466,11 @@ case $TASK in
    ;;
 
    "mount") 
-   if [ $PROTOCOL = "NFSv3" -o "NFSv4,1" ]
+   if [ $PROTOCOL = "NFSv3" -o $PROTOCOL = "NFSv4.1" ]
    then
-      write2log "********************** Starting script: mount operation **************************"
+      write2log "******************* Starting script: NFS mount operation *************************"
       mount_data_volume
-      write2log "********************** Finished script: mount operation **************************"
+      write2log "******************* Finished script: NFS mount operation *************************"
       # For debugging, set exit code to 0
       # This avoids cleanup process of SnapCenter
       # exit 0 
@@ -449,10 +478,10 @@ case $TASK in
    fi 
    if [ $PROTOCOL = "SAN" ]
    then
-      write2log "********************** Starting script: mount operation **************************"
+      write2log "******************* Starting script: SAN mount operation *************************"
       discover_lun
       mount_data_volume
-      write2log "********************** Finished script: mount operation **************************"
+      write2log "******************* Finished script: SAN mount operation *************************"
       # For debugging, set exit code to 0
       # This avoids cleanup process of SnapCenter
       # exit 0 
